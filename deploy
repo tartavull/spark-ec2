@@ -1,0 +1,1 @@
+./spark-ec2 --key-pair=tartavull --identity-file=/usr/people/it2/.ssh/tartavull.pem --region=us-east-1 --zone=us-east-1a --ami=ami-53c8fb39 --instance-type=m4.xlarge --additional-tags=User:Tartavull --user=ubuntu destroy my-spark-cluster

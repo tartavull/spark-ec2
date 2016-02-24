@@ -54,6 +54,7 @@ else:
 SPARK_EC2_VERSION = "1.6.0"
 SPARK_EC2_DIR = os.path.dirname(os.path.realpath(__file__))
 
+
 VALID_SPARK_VERSIONS = set([
     "0.7.3",
     "0.8.0",
@@ -522,7 +523,7 @@ def launch_cluster(conn, opts, cluster_name):
         master_group.authorize('tcp', 60070, 60070, authorized_address)
         master_group.authorize('tcp', 4040, 4045, authorized_address)
         # Rstudio (GUI for R) needs port 8787 for web access
-        master_group.authorize('tcp', 8787, 8787, authorized_address)
+        #master_group.authorize('tcp', 8787, 8787, authorized_address)
         # HDFS NFS gateway requires 111,2049,4242 for tcp & udp
         master_group.authorize('tcp', 111, 111, authorized_address)
         master_group.authorize('udp', 111, 111, authorized_address)
@@ -791,6 +792,20 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
 # or started EC2 cluster.
 def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key):
     master = get_dns_name(master_nodes[0], opts.private_ips)
+
+    #This script is design for using root user,
+    #if you are trying to use ubuntu os on aws,
+    #the easiest fix is to copy authorized_keys from 
+    #ubuntu to root, and the proceed using the root user
+    if opts.user != 'root':
+        ubuntu_key_to_root = "sudo cp /home/{}/.ssh/authorized_keys /root/.ssh/".format(opts.user)
+        ssh(master, opts, ubuntu_key_to_root)
+        for slave in slave_nodes:
+            slave_address = get_dns_name(slave, opts.private_ips)
+            ssh(slave_address, opts, ubuntu_key_to_root)
+        print('changed user to root')
+        opts.user = 'root'
+
     if deploy_ssh_key:
         print("Generating cluster's SSH key on master...")
         key_setup = """
@@ -807,7 +822,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key):
             ssh_write(slave_address, opts, ['tar', 'x'], dot_ssh_tar)
 
     modules = ['spark', 'ephemeral-hdfs', 'persistent-hdfs',
-               'mapreduce', 'spark-standalone', 'tachyon', 'rstudio']
+               'mapreduce', 'spark-standalone', 'tachyon']
 
     if opts.hadoop_major_version == "1":
         modules = list(filter(lambda x: x != "mapreduce", modules))
@@ -1248,10 +1263,6 @@ def get_ip_address(instance, private_ips=False):
 def get_dns_name(instance, private_ips=False):
     dns = instance.public_dns_name if not private_ips else \
         instance.private_ip_address
-    if not dns:
-        raise UsageError("Failed to determine hostname of {0}.\n"
-                         "Please check that you provided --private-ips if "
-                         "necessary".format(instance))
     return dns
 
 
